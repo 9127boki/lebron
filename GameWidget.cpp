@@ -17,7 +17,7 @@
 
 namespace {
 constexpr double Gravity = 1750.0;
-constexpr double JumpSpeed = -690.0;
+constexpr double JumpSpeed = -735.0;
 constexpr double MoveAcceleration = 1750.0;
 constexpr double AirMoveAcceleration = 1120.0;
 constexpr double MaxHorizontalSpeed = 480.0;
@@ -55,7 +55,7 @@ GameWidget::GameWidget(QWidget *parent)
     : QWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
-    setMinimumSize(820, 480);
+    setMinimumSize(1100, 620);
     loadSprites();
 
     QSettings settings(QStringLiteral("CodexQtGame"), QStringLiteral("JamesRunner"));
@@ -252,6 +252,9 @@ void GameWidget::loadSprites()
     loadAsset(m_flyingObstacleSprite, QStringLiteral("flying_obstacle.png"));
     loadAsset(m_rewardSprite, QStringLiteral("reward.png"));
     loadAsset(m_courtBackground, QStringLiteral("图片4.png"));
+    loadAsset(m_cityBackground, QStringLiteral("map2_background.png"));
+    loadAsset(m_spaceBackground, QStringLiteral("map3_background.png"));
+    loadAsset(m_menuBackground, QStringLiteral("menu_background.jpg"));
     createFallbackSprites();
 }
 
@@ -413,13 +416,35 @@ void GameWidget::spawnEntities(double dt)
 
     const QRectF ground = groundRect();
     if (m_spawnTimer <= 0.0) {
-        const double size = randomRange(54.0, 78.0);
+        const int variant = QRandomGenerator::global()->bounded(4);
+        double obstacleWidth = 64.0;
+        double obstacleHeight = 64.0;
+        double obstacleBottomOffset = 0.0;
+
+        if (variant == 0) {
+            obstacleWidth = randomRange(38.0, 56.0);
+            obstacleHeight = randomRange(38.0, 58.0);
+        } else if (variant == 1) {
+            obstacleWidth = randomRange(48.0, 70.0);
+            obstacleHeight = randomRange(68.0, 96.0);
+        } else if (variant == 2) {
+            obstacleWidth = randomRange(70.0, 104.0);
+            obstacleHeight = randomRange(34.0, 52.0);
+        } else {
+            obstacleWidth = randomRange(40.0, 62.0);
+            obstacleHeight = randomRange(40.0, 66.0);
+            obstacleBottomOffset = randomRange(46.0, 118.0);
+        }
+
         Entity obstacle;
         obstacle.kind = EntityKind::GroundObstacle;
-        obstacle.rect = QRectF(width() + 40.0, ground.top() - size, size, size);
+        obstacle.rect = QRectF(width() + 40.0,
+                               ground.top() - obstacleBottomOffset - obstacleHeight,
+                               obstacleWidth,
+                               obstacleHeight);
         obstacle.velocity = QPointF(-m_worldSpeed, 0.0);
         m_entities.push_back(obstacle);
-        m_spawnTimer = randomRange(1.0, 1.8);
+        m_spawnTimer = randomRange(0.45, 0.95);
     }
 
     if (m_ballTimer <= 0.0) {
@@ -435,19 +460,34 @@ void GameWidget::spawnEntities(double dt)
     if (m_flyingTimer <= 0.0) {
         Entity flying;
         flying.kind = EntityKind::FlyingObstacle;
-        flying.rect = QRectF(width() + 70.0, randomRange(115.0, ground.top() - 180.0), 82.0, 52.0);
-        flying.velocity = QPointF(-m_worldSpeed * randomRange(1.08, 1.28), randomRange(-18.0, 18.0));
+        const double flyingWidth = randomRange(48.0, 86.0);
+        const double flyingHeight = randomRange(28.0, 54.0);
+        const double flyingY = randomRange(90.0, ground.top() - 210.0);
+        flying.rect = QRectF(width() + 70.0, flyingY, flyingWidth, flyingHeight);
+        flying.velocity = QPointF(-m_worldSpeed * randomRange(1.16, 1.42), randomRange(-30.0, 30.0));
         m_entities.push_back(flying);
-        m_flyingTimer = randomRange(2.2, 3.6);
+        m_flyingTimer = randomRange(1.05, 2.15);
     }
 
     if (m_rewardTimer <= 0.0) {
         Entity reward;
         reward.kind = EntityKind::Reward;
-        reward.rect = QRectF(width() + 90.0, randomRange(120.0, ground.top() - 160.0), 42.0, 42.0);
-        reward.velocity = QPointF(-m_worldSpeed * 0.85, 0.0);
+        const int rewardLane = QRandomGenerator::global()->bounded(4);
+        const double rewardSize = randomRange(34.0, 58.0);
+        double rewardY = ground.top() - 130.0;
+        if (rewardLane == 0) {
+            rewardY = ground.top() - randomRange(105.0, 150.0);
+        } else if (rewardLane == 1) {
+            rewardY = ground.top() - randomRange(185.0, 250.0);
+        } else if (rewardLane == 2) {
+            rewardY = ground.top() - randomRange(285.0, 360.0);
+        } else {
+            rewardY = randomRange(92.0, ground.top() - 390.0);
+        }
+        reward.rect = QRectF(width() + randomRange(90.0, 250.0), rewardY, rewardSize, rewardSize);
+        reward.velocity = QPointF(-m_worldSpeed * randomRange(0.78, 0.98), 0.0);
         m_entities.push_back(reward);
-        m_rewardTimer = randomRange(5.2, 7.4);
+        m_rewardTimer = randomRange(6.0, 9.0);
     }
 }
 
@@ -518,6 +558,11 @@ void GameWidget::drawBackground(QPainter &painter)
         painter.setPen(QPen(Qt::white, 3));
         painter.drawEllipse(QRectF(width() * 0.58, ground.top() - 38, 86, 86));
     } else if (m_map == MapKind::City) {
+        if (!m_cityBackground.isNull()) {
+            painter.drawPixmap(rect(), m_cityBackground);
+            return;
+        }
+
         painter.setBrush(QColor(58, 64, 72));
         painter.drawRect(ground);
         painter.setBrush(QColor(35, 41, 48, 170));
@@ -529,6 +574,11 @@ void GameWidget::drawBackground(QPainter &painter)
         painter.setPen(QPen(QColor(236, 203, 91), 4, Qt::DashLine));
         painter.drawLine(QPointF(0, ground.center().y()), QPointF(width(), ground.center().y()));
     } else {
+        if (!m_spaceBackground.isNull()) {
+            painter.drawPixmap(rect(), m_spaceBackground);
+            return;
+        }
+
         painter.setBrush(QColor(36, 36, 64));
         painter.drawRect(ground);
         painter.setPen(QPen(QColor(114, 230, 215, 130), 2));
@@ -544,7 +594,11 @@ void GameWidget::drawBackground(QPainter &painter)
 void GameWidget::drawMainMenu(QPainter &painter)
 {
     m_map = MapKind::Court;
-    drawBackground(painter);
+    if (m_menuBackground.isNull()) {
+        drawBackground(painter);
+    } else {
+        painter.drawPixmap(rect(), m_menuBackground);
+    }
     painter.fillRect(rect(), QColor(10, 12, 18, 95));
 
     painter.setPen(Qt::white);
@@ -571,8 +625,7 @@ void GameWidget::drawMainMenu(QPainter &painter)
 
 void GameWidget::drawMapSelect(QPainter &painter)
 {
-    drawBackground(painter);
-    painter.fillRect(rect(), QColor(255, 255, 255, 60));
+    painter.fillRect(rect(), QColor(83, 35, 150));
 
     painter.setPen(QColor(24, 27, 34));
     painter.setFont(QFont(QStringLiteral("Arial"), 32, QFont::Black));

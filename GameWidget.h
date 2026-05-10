@@ -97,6 +97,9 @@ private:
     QPixmap m_flyingObstacleSprite;
     QPixmap m_rewardSprite;
     QPixmap m_courtBackground;
+    QPixmap m_cityBackground;
+    QPixmap m_spaceBackground;
+    QPixmap m_menuBackground;
 
     QPointF m_playerPos;
     QPointF m_playerVelocity;

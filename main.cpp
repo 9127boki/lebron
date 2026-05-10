@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 
     GameWidget widget;
     widget.setWindowTitle(QStringLiteral("James Runner"));
-    widget.resize(960, 540);
+    widget.resize(1280, 720);
     widget.show();
 
     return app.exec();
