@@ -11,6 +11,8 @@
 #include <QTimer>
 #include <QVector>
 #include <QWidget>
+#include <QMediaPlayer>
+#include <QAudioOutput>
 
 class QMouseEvent;
 class QPainter;
@@ -100,6 +102,8 @@ private:
     QPixmap m_cityBackground;
     QPixmap m_spaceBackground;
     QPixmap m_menuBackground;
+    QPixmap m_gameOverWinBg;
+    QPixmap m_gameOverLoseBg;
 
     QPointF m_playerPos;
     QPointF m_playerVelocity;
@@ -118,4 +122,10 @@ private:
     double m_invincibleTimer = 0.0;
     double m_healDelay = 0.0;
     double m_worldSpeed = 250.0;
+
+    QMediaPlayer* m_musicPlayer = nullptr;
+    QAudioOutput* m_audioOutput = nullptr;
+    void playMenuMusic();
+    void playGameMusic();
+    void playGameOverMusic();
 };

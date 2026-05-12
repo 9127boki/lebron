@@ -64,6 +64,26 @@ GameWidget::GameWidget(QWidget *parent)
     connect(&m_timer, &QTimer::timeout, this, &GameWidget::tick);
     m_clock.start();
     m_timer.start(16);
+    m_musicPlayer = new QMediaPlayer(this);
+    m_audioOutput = new QAudioOutput(this);
+
+    m_musicPlayer->setAudioOutput(m_audioOutput);
+
+    connect(m_musicPlayer,
+            &QMediaPlayer::mediaStatusChanged,
+            this,
+            [this](QMediaPlayer::MediaStatus status)
+            {
+                if (status == QMediaPlayer::EndOfMedia)
+                {
+                    m_musicPlayer->setPosition(0);
+                    m_musicPlayer->play();
+                }
+            });
+
+    m_audioOutput->setVolume(0.5f);
+
+    playMenuMusic();
 }
 
 void GameWidget::paintEvent(QPaintEvent *)
@@ -90,7 +110,6 @@ void GameWidget::paintEvent(QPaintEvent *)
         drawGameOver(painter);
     }
 }
-
 void GameWidget::keyPressEvent(QKeyEvent *event)
 {
     if (event->isAutoRepeat()) {
@@ -124,6 +143,7 @@ void GameWidget::keyPressEvent(QKeyEvent *event)
             startGame(MapKind::Space);
         } else if (key == Qt::Key_B || key == Qt::Key_Escape) {
             m_screen = Screen::MainMenu;
+            playMenuMusic();
             update();
         }
         return;
@@ -134,6 +154,7 @@ void GameWidget::keyPressEvent(QKeyEvent *event)
             startGame(m_map);
         } else if (key == Qt::Key_B) {
             m_screen = Screen::MainMenu;
+            playMenuMusic();
             update();
         }
         return;
@@ -170,7 +191,6 @@ void GameWidget::keyReleaseEvent(QKeyEvent *event)
         m_downPressed = false;
     }
 }
-
 void GameWidget::mousePressEvent(QMouseEvent *event)
 {
     if (m_screen == Screen::MainMenu && menuButtonRect(0).contains(event->pos())) {
@@ -188,7 +208,23 @@ void GameWidget::mousePressEvent(QMouseEvent *event)
         }
     }
 }
+void GameWidget::playMenuMusic()
+{
+m_musicPlayer->setSource(QUrl("qrc:/resources/menu.wav"));
+    m_musicPlayer->play();
+}
 
+void GameWidget::playGameMusic()
+{
+    m_musicPlayer->setSource(QUrl("qrc:/resources/game.wav"));
+    m_musicPlayer->play();
+}
+
+void GameWidget::playGameOverMusic()
+{
+    m_musicPlayer->setSource(QUrl("qrc:/resources/gameover.wav"));
+    m_musicPlayer->play();
+}
 void GameWidget::tick()
 {
     const double dt = qMin(m_clock.restart() / 1000.0, 0.033);
@@ -240,6 +276,7 @@ void GameWidget::startGame(MapKind map)
     m_map = map;
     resetGame();
     m_screen = Screen::Playing;
+    playGameMusic();
     m_clock.restart();
     update();
 }
@@ -256,6 +293,10 @@ void GameWidget::loadSprites()
     loadAsset(m_spaceBackground, QStringLiteral("map3_background.png"));
     loadAsset(m_menuBackground, QStringLiteral("menu_background.jpg"));
     createFallbackSprites();
+    loadAsset(m_gameOverWinBg, QStringLiteral("gameover_win.jpg"));
+    loadAsset(m_gameOverLoseBg, QStringLiteral("gameover_lose.jpg"));
+    createFallbackSprites();
+
 }
 
 void GameWidget::createFallbackSprites()
@@ -283,6 +324,16 @@ void GameWidget::createFallbackSprites()
         p.drawLine(QPointF(90, 140), QPointF(102, 184));
         p.end();
         m_playerSprite = pixmap;
+        if (m_gameOverWinBg.isNull()) {
+            QPixmap pix(width(), height());
+            pix.fill(QColor(20, 60, 20, 220)); // 暗绿色示意
+            m_gameOverWinBg = pix;
+        }
+        if (m_gameOverLoseBg.isNull()) {
+            QPixmap pix(width(), height());
+            pix.fill(QColor(60, 20, 20, 220)); // 暗红色示意
+            m_gameOverLoseBg = pix;
+        }
     }
 
     if (m_ballSprite.isNull()) {
@@ -533,6 +584,7 @@ void GameWidget::finishGame()
         settings.setValue(QStringLiteral("highScore"), m_highScore);
     }
     m_screen = Screen::GameOver;
+    playGameOverMusic();
 }
 
 void GameWidget::drawBackground(QPainter &painter)
@@ -602,8 +654,8 @@ void GameWidget::drawMainMenu(QPainter &painter)
     painter.fillRect(rect(), QColor(10, 12, 18, 95));
 
     painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), 48, QFont::Black));
-    painter.drawText(QRectF(0, height() * 0.15, width(), 70), Qt::AlignCenter, QStringLiteral("James Runner"));
+    painter.setFont(QFont(QStringLiteral("Arial"), 50, QFont::Black));
+    painter.drawText(QRectF(0, height() * 0.15, width(), 70), Qt::AlignCenter, QStringLiteral("詹皇快跑"));
 
     painter.setFont(QFont(QStringLiteral("Arial"), 17, QFont::Medium));
     painter.drawText(QRectF(width() * 0.18, height() * 0.31, width() * 0.64, 72),
@@ -720,18 +772,46 @@ void GameWidget::drawPausedOverlay(QPainter &painter)
 
 void GameWidget::drawGameOver(QPainter &painter)
 {
-    painter.fillRect(rect(), QColor(0, 0, 0, 165));
+    // ---------- 背景 ----------
+    const QPixmap &bg = (m_score >= 20) ? m_gameOverWinBg : m_gameOverLoseBg;
+    if (!bg.isNull())
+    {
+        painter.drawPixmap(rect(), bg);
+    }
+    else
+    {
+        // 回退：半透明黑色
+        painter.fillRect(rect(), QColor(0, 0, 0, 165));
+    }
+
+    // ---------- 文字 ----------
     painter.setPen(Qt::white);
     drawCenteredText(painter, QRectF(0, height() * 0.25, width(), 62), QStringLiteral("游戏结束"), 36, true);
 
+    // 分数行
     painter.setFont(QFont(QStringLiteral("Arial"), 18, QFont::Bold));
     painter.drawText(QRectF(0, height() * 0.40, width(), 36), Qt::AlignCenter,
                      QStringLiteral("本局分数：%1   最高纪录：%2").arg(m_score).arg(m_highScore));
+
+    // 评语
+    QString comment = (m_score >= 20) ? QStringLiteral("宝刀未老") : QStringLiteral("英雄迟暮");
+    painter.setFont(QFont(QStringLiteral("Arial"), 20, QFont::Bold));
+    if (m_score >= 20) {
+        painter.setPen(QColor(245, 196, 62));   // 金色
+    } else {
+        painter.setPen(QColor(180, 180, 180));  // 灰色
+    }
+    painter.drawText(QRectF(0, height() * 0.47, width(), 36), Qt::AlignCenter, comment);
+    painter.setPen(Qt::white);
+
+    // 新纪录提示
     if (m_recordBroken) {
         painter.setPen(QColor(245, 196, 62));
-        painter.drawText(QRectF(0, height() * 0.48, width(), 34), Qt::AlignCenter, QStringLiteral("新纪录已自动保存"));
+        painter.drawText(QRectF(0, height() * 0.53, width(), 34), Qt::AlignCenter, QStringLiteral("新纪录已自动保存"));
         painter.setPen(Qt::white);
     }
+
+    // 操作提示
     painter.setFont(QFont(QStringLiteral("Arial"), 16));
     painter.drawText(QRectF(0, height() * 0.60, width(), 38), Qt::AlignCenter,
                      QStringLiteral("按 R 重新开始，按 B 返回主菜单"));
