@@ -1,4 +1,4 @@
-QT += widgets
+QT += widgets multimedia
 
 CONFIG += c++17
 TEMPLATE = app
@@ -12,3 +12,6 @@ HEADERS += \
     src/GameWidget.h
 
 msvc:QMAKE_CXXFLAGS += /utf-8
+
+RESOURCES += \
+    resources.qrc
